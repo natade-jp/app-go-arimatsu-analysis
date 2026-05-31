@@ -1,7 +1,13 @@
+// @ts-check
+
 import { parseImageTimetable, writeCsv } from "./imageTableOcr.js";
 
 const [inputDir = "data/images", outputCsv = "data/output.csv"] = process.argv.slice(2);
 
+/**
+ * 画像ディレクトリを解析してCSVへ出力する
+ * @returns {Promise<void>} 処理完了
+ */
 async function main() {
 	console.log("入力画像ディレクトリ:", inputDir);
 	console.log("出力CSV:", outputCsv);

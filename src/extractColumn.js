@@ -1,8 +1,13 @@
-import fs from "fs/promises";
+// @ts-check
+
 import path from "path";
 import sharp from "sharp";
 import { getColumnRect, getLayoutForPage, getPageNumber } from "./common.js";
 
+/**
+ * 指定された画像から対象列を切り出して保存する
+ * @returns {Promise<void>} 処理完了
+ */
 async function main() {
 	const [imagePath, columnArg, outputPathArg] = process.argv.slice(2);
 	if (!imagePath || columnArg == null) {
@@ -47,7 +52,7 @@ async function main() {
 			process.exit(1);
 		}
 
-		await image.extract(rect).toFile(outputPath);
+		await image.clone().extract(rect).toFile(outputPath);
 
 		console.log(`ページ ${pageNumber} (${pageNumber % 2 === 1 ? "odd" : "even"}) の列 ${columnIndex} を切り出しました。`);
 		console.log(`出力: ${outputPath}`);

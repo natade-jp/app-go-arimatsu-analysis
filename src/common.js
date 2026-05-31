@@ -1,5 +1,41 @@
+// @ts-check
+
 import { pageLayouts } from "./tableConfig.js";
 
+/**
+ * CSVヘッダー定義
+ * @typedef {Object} CsvHeaderItem
+ * @property {string} id CSV出力時のキー
+ * @property {string} title CSVヘッダー名
+ */
+
+/**
+ * テーブル矩形定義
+ * @typedef {Object} TableRect
+ * @property {number} left 左端X座標
+ * @property {number} top 上端Y座標
+ * @property {number} right 右端X座標
+ * @property {number} bottom 下端Y座標
+ */
+
+/**
+ * ページ解析用レイアウト定義
+ * @typedef {Object} PageLayout
+ * @property {TableRect} tableRect テーブル領域
+ * @property {number} columns 列数
+ * @property {number[]} [columnWidths] 列ごとの幅
+ */
+
+/**
+ * 列切り出し用矩形
+ * @typedef {Object} ColumnRect
+ * @property {number} left 左端X座標
+ * @property {number} top 上端Y座標
+ * @property {number} width 幅
+ * @property {number} height 高さ
+ */
+
+/** @type {CsvHeaderItem[]} */
 export const csvHeader = [
 	{ id: "運行日区分", title: "運行日区分" },
 	{ id: "改正日", title: "改正日" },
@@ -17,22 +53,44 @@ export const csvHeader = [
 	{ id: "備考", title: "備考" },
 ];
 
+/**
+ * ファイル名からページ番号を取得する
+ * @param {string} fileName ファイル名
+ * @returns {?number} ページ番号
+ */
 export function getPageNumber(fileName) {
 	const match = fileName.match(/(\d+)/);
 	return match ? Number(match[1]) : null;
 }
 
+/**
+ * ページ番号に対応するレイアウト定義を取得する
+ * @param {number} pageNumber ページ番号
+ * @returns {PageLayout} ページ解析用レイアウト定義
+ */
 export function getLayoutForPage(pageNumber) {
 	return pageLayouts[pageNumber % 2 === 1 ? "odd" : "even"];
 }
 
+/**
+ * 画像ファイル名をページ番号順に比較する
+ * @param {string} a 比較対象の画像ファイル名
+ * @param {string} b 比較対象の画像ファイル名
+ * @returns {number} 比較結果
+ */
 export function compareImageNames(a, b) {
-	const aNum = getPageNumber(a) || Number.MAX_SAFE_INTEGER;
-	const bNum = getPageNumber(b) || Number.MAX_SAFE_INTEGER;
+	const aNum = getPageNumber(a) ?? Number.MAX_SAFE_INTEGER;
+	const bNum = getPageNumber(b) ?? Number.MAX_SAFE_INTEGER;
 	if (aNum !== bNum) return aNum - bNum;
 	return a.localeCompare(b, "ja");
 }
 
+/**
+ * 指定列の切り出し矩形を取得する
+ * @param {PageLayout} layout ページ解析用レイアウト定義
+ * @param {number} columnIndex 列インデックス
+ * @returns {ColumnRect} 列切り出し用矩形
+ */
 export function getColumnRect(layout, columnIndex) {
 	const left = layout.tableRect.left;
 	const top = layout.tableRect.top;

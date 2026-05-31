@@ -1,3 +1,5 @@
+// @ts-check
+
 import fs from "fs/promises";
 import path from "path";
 import sharp from "sharp";
@@ -5,8 +7,48 @@ import { createWorker } from "tesseract.js";
 import { createObjectCsvWriter } from "csv-writer";
 import { compareImageNames, getColumnRect, getLayoutForPage, getPageNumber, csvHeader } from "./common.js";
 
+/** @type {ReadonlySet<string>} */
 const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".tif", ".tiff", ".webp"]);
 
+/**
+ * CSV出力用レコード
+ * @typedef {Object.<string, string | number>} TimetableRecord
+ */
+
+/**
+ * OCR対象フィールド定義
+ * @typedef {Object} LayoutField
+ * @property {string} key 出力項目名
+ * @property {number} y 列画像内のY座標
+ * @property {number} height 切り出し高さ
+ */
+
+/**
+ * テーブル矩形定義
+ * @typedef {Object} TableRect
+ * @property {number} left 左端X座標
+ * @property {number} top 上端Y座標
+ * @property {number} right 右端X座標
+ * @property {number} bottom 下端Y座標
+ */
+
+/**
+ * ページ解析用レイアウト定義
+ * @typedef {Object} PageLayout
+ * @property {string} name レイアウト名
+ * @property {number} columns 列数
+ * @property {number} rowMargin 項目切り出し時の上下余白
+ * @property {string} operatingDay 運行日区分
+ * @property {string} revisionDate 改正日
+ * @property {TableRect} tableRect テーブル領域
+ * @property {LayoutField[]} fields OCR対象フィールド一覧
+ */
+
+/**
+ * 画像ディレクトリ内の時刻表画像をOCR解析する
+ * @param {string} imageDir 画像ファイルが格納されているディレクトリ
+ * @returns {Promise<TimetableRecord[]>} OCR解析結果
+ */
 export async function parseImageTimetable(imageDir) {
 	const imageFiles = await getImageFiles(imageDir);
 	if (imageFiles.length === 0) {
@@ -26,23 +68,37 @@ export async function parseImageTimetable(imageDir) {
 	await worker.initialize("jpn");
 
 	const records = [];
-	for (const [index, fileName] of imageFiles.entries()) {
-		const pageNumber = getPageNumber(fileName) || index + 1;
-		const layout = getLayoutForPage(pageNumber);
-		if (!layout) {
-			console.warn(`ページ ${pageNumber} のレイアウトが見つかりません。スキップします: ${fileName}`);
-			continue;
-		}
 
-		console.log(`解析中: ${fileName} (ページ ${pageNumber}, ${layout.name}ページレイアウト)`);
-		const pageRecords = await parsePageImage(fileName, imageDir, pageNumber, layout, worker);
-		records.push(...pageRecords);
+	try {
+		for (const [index, fileName] of imageFiles.entries()) {
+			// ファイル名からページ番号が取れない場合は、並び順をページ番号として扱う
+			const pageNumber = getPageNumber(fileName) || index + 1;
+			const layout = getLayoutForPage(pageNumber);
+
+			if (!layout) {
+				console.warn(`ページ ${pageNumber} のレイアウトが見つかりません。スキップします: ${fileName}`);
+				continue;
+			}
+
+			console.log(`解析中: ${fileName} (ページ ${pageNumber}, ${layout.name}ページレイアウト)`);
+
+			const pageRecords = await parsePageImage(fileName, imageDir, pageNumber, layout, worker);
+			records.push(...pageRecords);
+		}
+	} finally {
+		// OCRワーカーは重いリソースなので、途中でエラーになっても必ず終了する
+		await worker.terminate();
 	}
 
-	await worker.terminate();
 	return records;
 }
 
+/**
+ * OCR解析結果をCSVファイルへ出力する
+ * @param {TimetableRecord[]} records CSV出力用レコード一覧
+ * @param {string} outputPath CSV出力先パス
+ * @returns {Promise<void>} 処理完了
+ */
 export async function writeCsv(records, outputPath) {
 	const csvWriter = createObjectCsvWriter({
 		path: outputPath,
@@ -51,6 +107,11 @@ export async function writeCsv(records, outputPath) {
 	await csvWriter.writeRecords(records);
 }
 
+/**
+ * 指定ディレクトリ内の画像ファイル名一覧を取得する
+ * @param {string} imageDir 画像ファイルが格納されているディレクトリ
+ * @returns {Promise<string[]>} ページ番号順に並べた画像ファイル名一覧
+ */
 async function getImageFiles(imageDir) {
 	const entries = await fs.readdir(imageDir, { withFileTypes: true });
 	return entries
@@ -59,13 +120,23 @@ async function getImageFiles(imageDir) {
 		.map((entry) => entry.name);
 }
 
+/**
+ * ページ画像を列・項目ごとに切り出してOCR解析する
+ * @param {string} fileName 画像ファイル名
+ * @param {string} imageDir 画像ファイルが格納されているディレクトリ
+ * @param {number} pageNumber ページ番号
+ * @param {PageLayout} layout ページ解析用レイアウト定義
+ * @param {import("tesseract.js").Worker} worker OCR解析用ワーカー
+ * @returns {Promise<TimetableRecord[]>} ページ内のOCR解析結果
+ */
 async function parsePageImage(fileName, imageDir, pageNumber, layout, worker) {
 	const filePath = path.join(imageDir, fileName);
 	const image = sharp(filePath);
 	const metadata = await image.metadata();
 
-	const tableHeight = layout.tableRect.bottom - layout.tableRect.top;
+	/** @type {TimetableRecord[]} */
 	const pageRecords = [];
+
 	for (let columnIndex = 0; columnIndex < layout.columns; columnIndex += 1) {
 		const rect = getColumnRect(layout, columnIndex);
 
@@ -74,6 +145,7 @@ async function parsePageImage(fileName, imageDir, pageNumber, layout, worker) {
 			continue;
 		}
 
+		// sharp は加工パイプラインを持つため、同じ画像から複数回切り出す場合は clone() して処理を分離する
 		const columnBuffer = await image.clone().extract(rect).png().toBuffer();
 		const columnImage = sharp(columnBuffer);
 		const columnMetadata = await columnImage.metadata();
@@ -83,6 +155,7 @@ async function parsePageImage(fileName, imageDir, pageNumber, layout, worker) {
 			console.log(`[DEBUG] columnMetadata: width=${columnMetadata.width}, height=${columnMetadata.height}`);
 		}
 
+		/** @type {TimetableRecord} */
 		const record = {
 			運行日区分: layout.operatingDay,
 			改正日: layout.revisionDate,
@@ -90,6 +163,7 @@ async function parsePageImage(fileName, imageDir, pageNumber, layout, worker) {
 		};
 
 		for (const field of layout.fields) {
+			// OCR対象の文字が少し上下にずれても拾えるように、定義された高さへ余白を追加して切り出す
 			const cropTop = Math.max(0, field.y - layout.rowMargin);
 			const cropHeight = Math.min(field.height + layout.rowMargin * 2, columnMetadata.height - cropTop);
 
@@ -104,7 +178,18 @@ async function parsePageImage(fileName, imageDir, pageNumber, layout, worker) {
 			}
 
 			try {
-				const fieldBuffer = await columnImage.clone().extract({ left: 0, top: cropTop, width: columnMetadata.width, height: cropHeight }).png().toBuffer();
+				// 列画像からフィールド単位で再切り出しして、OCRに渡す画像を小さくする
+				const fieldBuffer = await columnImage
+					.clone()
+					.extract({
+						left: 0,
+						top: cropTop,
+						width: columnMetadata.width,
+						height: cropHeight,
+					})
+					.png()
+					.toBuffer();
+
 				const rawText = await recognizeText(worker, fieldBuffer);
 				record[field.key] = normalizeField(field.key, rawText);
 			} catch (error) {
@@ -120,25 +205,43 @@ async function parsePageImage(fileName, imageDir, pageNumber, layout, worker) {
 	return pageRecords;
 }
 
+/**
+ * 画像バッファから文字列をOCR解析する
+ * @param {import("tesseract.js").Worker} worker OCR解析用ワーカー
+ * @param {Buffer} imageBuffer OCR対象画像バッファ
+ * @returns {Promise<string>} OCR解析結果文字列
+ */
 async function recognizeText(worker, imageBuffer) {
 	const { data } = await worker.recognize(imageBuffer);
 	return (data.text || "").trim();
 }
 
+/**
+ * OCR結果を項目ごとの形式に正規化する
+ * @param {string} key 出力項目名
+ * @param {string} text OCR結果文字列
+ * @returns {string} 正規化後の文字列
+ */
 function normalizeField(key, text) {
 	const normalized = text
 		.replace(/[\r\n]+/g, " ")
 		.replace(/\s+/g, " ")
 		.trim();
+
 	if (["名鉄名古屋 着", "名鉄名古屋 発", "金山 着", "金山 発", "鳴海 着", "鳴海 発", "有松 着"].includes(key)) {
 		return normalizeTime(normalized);
 	}
 	if (key === "列車番号") {
-		return normalized.replace(/[^0-9０-９]/g, "").replace(/[０-９]/g, (c) => String(c.charCodeAt(0) - 0xff10));
+		return text;
 	}
 	return normalized;
 }
 
+/**
+ * OCR結果の時刻文字列をHHmm形式に正規化する
+ * @param {string} text OCR結果文字列
+ * @returns {string} HHmm形式の時刻文字列
+ */
 function normalizeTime(text) {
 	const match = text.match(/([0-2]?[0-9])\D?([0-5][0-9])/);
 	if (!match) {
