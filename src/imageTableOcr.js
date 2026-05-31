@@ -28,7 +28,7 @@ export async function parseImageTimetable(imageDir) {
 	const records = [];
 	for (const [index, fileName] of imageFiles.entries()) {
 		const pageNumber = getPageNumber(fileName) || index + 1;
-		const layout = pageLayouts[pageNumber % 2 === 1 ? "odd" : "even"];
+		const layout = getLayoutForPage(pageNumber);
 		if (!layout) {
 			console.warn(`ページ ${pageNumber} のレイアウトが見つかりません。スキップします: ${fileName}`);
 			continue;
@@ -64,6 +64,7 @@ async function parsePageImage(fileName, imageDir, pageNumber, layout, worker) {
 	const image = sharp(filePath);
 	const metadata = await image.metadata();
 
+	const tableHeight = layout.tableRect.bottom - layout.tableRect.top;
 	const pageRecords = [];
 	for (let columnIndex = 0; columnIndex < layout.columns; columnIndex += 1) {
 		const rect = getColumnRect(layout, columnIndex);
@@ -74,6 +75,13 @@ async function parsePageImage(fileName, imageDir, pageNumber, layout, worker) {
 		}
 
 		const columnBuffer = await image.extract(rect).png().toBuffer();
+		const columnImage = sharp(columnBuffer);
+		const columnMetadata = await columnImage.metadata();
+
+		if (columnIndex === 0) {
+			console.log(`[DEBUG] rect: left=${rect.left}, top=${rect.top}, width=${rect.width}, height=${rect.height}`);
+			console.log(`[DEBUG] columnMetadata: width=${columnMetadata.width}, height=${columnMetadata.height}`);
+		}
 
 		const record = {
 			運行日区分: layout.operatingDay,
@@ -83,16 +91,27 @@ async function parsePageImage(fileName, imageDir, pageNumber, layout, worker) {
 
 		for (const field of layout.fields) {
 			const cropTop = Math.max(0, field.y - layout.rowMargin);
-			const cropHeight = Math.min(field.height + layout.rowMargin * 2, tableHeight - cropTop);
+			const cropHeight = Math.min(field.height + layout.rowMargin * 2, columnMetadata.height - cropTop);
 
-			if (cropTop + cropHeight > tableHeight) {
-				console.warn(`フィールド ${field.key} の切り出し範囲がページ範囲を超えました。調整してください。`);
+			if (columnIndex === 0) {
+				console.log(`[DEBUG] field=${field.key}, y=${field.y}, cropTop=${cropTop}, cropHeight=${cropHeight}, columnHeight=${columnMetadata.height}`);
 			}
 
-			const fieldBuffer = await sharp(columnBuffer).extract({ left: 0, top: cropTop, width, height: cropHeight }).png().toBuffer();
+			if (cropTop < 0 || cropHeight <= 0 || columnMetadata.width <= 0) {
+				console.warn(`フィールド ${field.key} (列${columnIndex}) の切り出し領域が不正です: cropTop=${cropTop}, cropHeight=${cropHeight}, width=${columnMetadata.width}, columnHeight=${columnMetadata.height}`);
+				record[field.key] = "";
+				continue;
+			}
 
-			const rawText = await recognizeText(worker, fieldBuffer);
-			record[field.key] = normalizeField(field.key, rawText);
+			try {
+				const fieldBuffer = await columnImage.extract({ left: 0, top: cropTop, width: columnMetadata.width, height: cropHeight }).png().toBuffer();
+				const rawText = await recognizeText(worker, fieldBuffer);
+				record[field.key] = normalizeField(field.key, rawText);
+			} catch (error) {
+				console.error(`フィールド ${field.key} (列${columnIndex}) の処理中にエラー: ${error.message}`);
+				console.error(`  cropTop=${cropTop}, cropHeight=${cropHeight}, width=${rect.width}, columnBuffer size=${columnBuffer.length}`);
+				record[field.key] = "";
+			}
 		}
 
 		pageRecords.push(record);
