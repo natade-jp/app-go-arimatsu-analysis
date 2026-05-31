@@ -74,7 +74,7 @@ async function parsePageImage(fileName, imageDir, pageNumber, layout, worker) {
 			continue;
 		}
 
-		const columnBuffer = await image.extract(rect).png().toBuffer();
+		const columnBuffer = await image.clone().extract(rect).png().toBuffer();
 		const columnImage = sharp(columnBuffer);
 		const columnMetadata = await columnImage.metadata();
 
@@ -104,7 +104,7 @@ async function parsePageImage(fileName, imageDir, pageNumber, layout, worker) {
 			}
 
 			try {
-				const fieldBuffer = await columnImage.extract({ left: 0, top: cropTop, width: columnMetadata.width, height: cropHeight }).png().toBuffer();
+				const fieldBuffer = await columnImage.clone().extract({ left: 0, top: cropTop, width: columnMetadata.width, height: cropHeight }).png().toBuffer();
 				const rawText = await recognizeText(worker, fieldBuffer);
 				record[field.key] = normalizeField(field.key, rawText);
 			} catch (error) {
