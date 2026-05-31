@@ -10,6 +10,26 @@
 			"cwd": "${workspaceFolder}",
 			"console": "integratedTerminal",
 			"skipFiles": ["<node_internals>/**"]
+		},
+		{
+			"type": "node",
+			"request": "launch",
+			"name": "npm run inspect-image",
+			"runtimeExecutable": "npm",
+			"runtimeArgs": ["run", "inspect-image"],
+			"cwd": "${workspaceFolder}",
+			"console": "integratedTerminal",
+			"skipFiles": ["<node_internals>/**"]
+		},
+		{
+			"type": "node",
+			"request": "launch",
+			"name": "npm run extract-column",
+			"runtimeExecutable": "npm",
+			"runtimeArgs": ["run", "extract-column"],
+			"cwd": "${workspaceFolder}",
+			"console": "integratedTerminal",
+			"skipFiles": ["<node_internals>/**"]
 		}
 	]
 }
