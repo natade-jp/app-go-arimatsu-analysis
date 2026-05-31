@@ -212,7 +212,12 @@ async function parsePageImage(fileName, imageDir, pageNumber, layout, worker, fi
 					.toBuffer();
 
 				const rawText = await recognizeText(worker, fieldBuffer);
-				record[field.key] = normalizeField(field.key, rawText);
+				const normalizedText = normalizeField(field.key, rawText);
+
+				// OCR結果のログは必要に応じて出力する。大量のフィールドがある場合は、ログをコメントアウトしても良い。
+				console.log(`[${fileIndex}/${fileCount}] ${fileName} - 列 ${columnNumber}/${layout.columns} - ${field.key}: "${rawText}" => "${normalizedText}"`);
+
+				record[field.key] = normalizedText;
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
 
@@ -222,6 +227,9 @@ async function parsePageImage(fileName, imageDir, pageNumber, layout, worker, fi
 				record[field.key] = "";
 			}
 		}
+
+		console.log(`[${fileIndex}/${fileCount}] ${fileName} - 列 ${columnNumber}/${layout.columns} の解析結果:`);
+		console.table(record);
 
 		pageRecords.push(record);
 	}
@@ -247,18 +255,119 @@ async function recognizeText(worker, imageBuffer) {
  * @returns {string} 正規化後の文字列
  */
 function normalizeField(key, text) {
+	if (key === "列車番号") {
+		return normalizeTrainNumber(text);
+	}
+
 	const normalized = text
-		.replace(/[\r\n]+/g, " ")
-		.replace(/\s+/g, " ")
+		.replace(/[\r\n]+/g, "")
+		.replace(/\s+/g, "")
 		.trim();
 
 	if (["名鉄名古屋 着", "名鉄名古屋 発", "金山 着", "金山 発", "鳴海 着", "鳴海 発", "有松 着"].includes(key)) {
 		return normalizeTime(normalized);
 	}
-	if (key === "列車番号") {
-		return text;
+
+	if (key === "運行種別") {
+		return normalizeTrainType(normalized);
 	}
+
 	return normalized;
+}
+
+/**
+ * OCR結果の列車番号1行分を正規化する
+ * @param {string} text OCR結果文字列
+ * @returns {string} 正規化後の列車番号
+ */
+function normalizeTrainNumberLine(text) {
+	return normalizeDigits(text)
+		.replace(/[Ａ-Ｚａ-ｚ]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0))
+		.replace(/\s+/g, "")
+		.replace(/[^0-9A-Za-z]/g, "");
+}
+
+/**
+ * OCR結果の列車番号を正規化する
+ * @param {string} text OCR結果文字列
+ * @returns {string} 正規化後の列車番号
+ */
+function normalizeTrainNumber(text) {
+	const candidates = text
+		.split(/\r?\n/)
+		.map((line) => normalizeTrainNumberLine(line))
+		.filter((line) => line.length > 0);
+
+	if (candidates.length === 0) {
+		return "";
+	}
+
+	return candidates[0];
+}
+
+/**
+ * 運行種別補正定義
+ * @typedef {Object} TrainTypeCorrection
+ * @property {string} keyword OCR結果に含まれる文字列
+ * @property {string} value 補正後の運行種別
+ */
+
+/**
+ * OCR結果の運行種別を正規化する
+ * @param {string} text OCR結果文字列
+ * @returns {string} 正規化後の運行種別
+ */
+function normalizeTrainType(text) {
+	const normalized = text.replace(/\s+/g, "");
+
+	/** @type {TrainTypeCorrection[]} */
+	const correctionList = [
+		{ keyword: "快特", value: "快特" },
+		{ keyword: "特急", value: "特急" },
+		{ keyword: "急行", value: "急行" },
+		{ keyword: "準急", value: "準急" },
+
+		// OCRで「普通」が崩れやすいため、最後に判定する
+		{ keyword: "普通", value: "普通" },
+		{ keyword: "暗通", value: "普通" },
+		{ keyword: "智通", value: "普通" },
+		{ keyword: "普", value: "普通" },
+		{ keyword: "通", value: "普通" },
+	];
+
+	const correction = correctionList.find((item) => normalized.includes(item.keyword));
+
+	return correction?.value ?? normalized;
+}
+
+/**
+ * 丸数字・全角数字を通常の半角数字へ変換する
+ * @param {string} text 変換対象文字列
+ * @returns {string} 変換後文字列
+ */
+function normalizeDigits(text) {
+	return text
+		.replace(/⑳/g, "20")
+		.replace(/⑲/g, "19")
+		.replace(/⑱/g, "18")
+		.replace(/⑰/g, "17")
+		.replace(/⑯/g, "16")
+		.replace(/⑮/g, "15")
+		.replace(/⑭/g, "14")
+		.replace(/⑬/g, "13")
+		.replace(/⑫/g, "12")
+		.replace(/⑪/g, "11")
+		.replace(/⑩/g, "10")
+		.replace(/[⓪０]/g, "0")
+		.replace(/[①１]/g, "1")
+		.replace(/[②２]/g, "2")
+		.replace(/[③３]/g, "3")
+		.replace(/[④４]/g, "4")
+		.replace(/[⑤５]/g, "5")
+		.replace(/[⑥６]/g, "6")
+		.replace(/[⑦７]/g, "7")
+		.replace(/[⑧８]/g, "8")
+		.replace(/[⑨９]/g, "9");
 }
 
 /**
@@ -267,11 +376,27 @@ function normalizeField(key, text) {
  * @returns {string} HHmm形式の時刻文字列
  */
 function normalizeTime(text) {
-	const match = text.match(/([0-2]?[0-9])\D?([0-5][0-9])/);
-	if (!match) {
-		return text;
+	// 時刻文字列に「レ」が含まれている場合は止まらないため「0」とみなす
+	if (/レ/.test(text)) {
+		return "0";
 	}
-	const hh = match[1].padStart(2, "0");
-	const mm = match[2];
-	return `${hh}${mm}`;
+
+	const digitText = normalizeDigits(text).replace(/[^0-9]/g, "");
+
+	// 数字が全くない場合はOCRミスなので「0」とみなす
+	if (digitText.length === 0) {
+		return "0";
+	}
+
+	// 例: 536 → 0536
+	if (/^[0-9]{3}$/.test(digitText)) {
+		return `0${digitText}`;
+	}
+
+	// 例: 1536 → 1536
+	if (/^[0-9]{4}$/.test(digitText)) {
+		return digitText;
+	}
+
+	return text;
 }

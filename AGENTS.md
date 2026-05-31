@@ -13,7 +13,7 @@
 ## これまでの流れ
 
 1. 空のリポジトリに Node.js プロジェクトを初期化
-2. `src/index.js` / `src/pdfParser.js` など基本構造を生成
+2. `src/index.js` の基本構造を生成
 3. `tesseract.js` と `sharp` による画像OCRパイプラインを導入
 4. `README.md` に実行手順と考え方を記載
 5. `pdftoppm` を利用し、PDFをPNG画像に変換する方針を決定

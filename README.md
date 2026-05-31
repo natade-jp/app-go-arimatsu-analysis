@@ -62,7 +62,6 @@ npm run parse-images
 
 - `src/`
     - `index.js` - エントリーポイント
-    - `pdfParser.js` - PDF読み込み・解析・CSV生成のロジック
     - `imageTableOcr.js` - 画像OCR解析ロジック
     - `tableConfig.js` - 画像レイアウト設定
 - `data/` - PDF資料や出力CSVを置く場所
