@@ -14,6 +14,7 @@ export const csvHeader = [
 	{ id: "鳴海 着", title: "鳴海 着" },
 	{ id: "鳴海 発", title: "鳴海 発" },
 	{ id: "有松 着", title: "有松 着" },
+	{ id: "備考", title: "備考" },
 ];
 
 export function getPageNumber(fileName) {
