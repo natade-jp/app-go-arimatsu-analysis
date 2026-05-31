@@ -3,23 +3,7 @@ import path from "path";
 import sharp from "sharp";
 import { createWorker } from "tesseract.js";
 import { createObjectCsvWriter } from "csv-writer";
-import { pageLayouts } from "./tableConfig.js";
-
-const csvHeader = [
-	{ id: "運行日区分", title: "運行日区分" },
-	{ id: "改正日", title: "改正日" },
-	{ id: "ページ番号", title: "ページ番号" },
-	{ id: "列車番号", title: "列車番号" },
-	{ id: "運行種別", title: "運行種別" },
-	{ id: "行先", title: "行先" },
-	{ id: "名鉄名古屋 着", title: "名鉄名古屋 着" },
-	{ id: "名鉄名古屋 発", title: "名鉄名古屋 発" },
-	{ id: "金山 着", title: "金山 着" },
-	{ id: "金山 発", title: "金山 発" },
-	{ id: "鳴海 着", title: "鳴海 着" },
-	{ id: "鳴海 発", title: "鳴海 発" },
-	{ id: "有松 着", title: "有松 着" },
-];
+import { compareImageNames, getColumnRect, getLayoutForPage, getPageNumber, csvHeader } from "./common.js";
 
 const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".tif", ".tiff", ".webp"]);
 
@@ -75,41 +59,21 @@ async function getImageFiles(imageDir) {
 		.map((entry) => entry.name);
 }
 
-function compareImageNames(a, b) {
-	const aNum = getPageNumber(a) || Number.MAX_SAFE_INTEGER;
-	const bNum = getPageNumber(b) || Number.MAX_SAFE_INTEGER;
-	if (aNum !== bNum) return aNum - bNum;
-	return a.localeCompare(b, "ja");
-}
-
-function getPageNumber(fileName) {
-	const match = fileName.match(/(\d+)/);
-	return match ? Number(match[1]) : null;
-}
-
 async function parsePageImage(fileName, imageDir, pageNumber, layout, worker) {
 	const filePath = path.join(imageDir, fileName);
 	const image = sharp(filePath);
 	const metadata = await image.metadata();
 
-	const left = layout.tableRect.left;
-	const top = layout.tableRect.top;
-	const tableWidth = layout.tableRect.right - layout.tableRect.left;
-	const tableHeight = layout.tableRect.bottom - layout.tableRect.top;
-	const defaultColumnWidth = Math.floor(tableWidth / layout.columns);
-	const columnWidths = layout.columnWidths || Array(layout.columns).fill(defaultColumnWidth);
-
 	const pageRecords = [];
 	for (let columnIndex = 0; columnIndex < layout.columns; columnIndex += 1) {
-		const columnLeft = left + columnWidths.slice(0, columnIndex).reduce((sum, width) => sum + width, 0);
-		const width = columnWidths[columnIndex] || defaultColumnWidth;
+		const rect = getColumnRect(layout, columnIndex);
 
-		if (columnLeft + width > metadata.width) {
+		if (rect.left + rect.width > metadata.width) {
 			console.warn(`列 ${columnIndex + 1} の幅が画像範囲を超えています。調整が必要です。`);
 			continue;
 		}
 
-		const columnBuffer = await image.extract({ left: columnLeft, top, width, height: tableHeight }).png().toBuffer();
+		const columnBuffer = await image.extract(rect).png().toBuffer();
 
 		const record = {
 			運行日区分: layout.operatingDay,

@@ -1,6 +1,7 @@
 node_modules/
 .DS_Store
 .env
+*.png
 data/*.pdf
 data/images/*
 !data/images/.gitkeep

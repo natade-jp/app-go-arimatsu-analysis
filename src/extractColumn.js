@@ -1,31 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
 import sharp from "sharp";
-import { pageLayouts } from "./tableConfig.js";
-
-function getPageNumber(fileName) {
-	const match = fileName.match(/(\d+)/);
-	return match ? Number(match[1]) : null;
-}
-
-function getLayoutForPage(pageNumber) {
-	return pageLayouts[pageNumber % 2 === 1 ? "odd" : "even"];
-}
-
-function getColumnRect(layout, columnIndex) {
-	const left = layout.tableRect.left;
-	const top = layout.tableRect.top;
-	const tableWidth = layout.tableRect.right - layout.tableRect.left;
-	const columnWidths = layout.columnWidths || Array(layout.columns).fill(Math.floor(tableWidth / layout.columns));
-	const width = columnWidths[columnIndex] || 0;
-	const offsetLeft = left + columnWidths.slice(0, columnIndex).reduce((sum, w) => sum + w, 0);
-	return {
-		left: offsetLeft,
-		top,
-		width,
-		height: layout.tableRect.bottom - layout.tableRect.top,
-	};
-}
+import { getColumnRect, getLayoutForPage, getPageNumber } from "./common.js";
 
 async function main() {
 	const [imagePath, columnArg, outputPathArg] = process.argv.slice(2);
