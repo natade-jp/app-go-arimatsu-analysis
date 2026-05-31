@@ -15,20 +15,34 @@
 npm install
 ```
 
-2. PDFを画像化して、`data/images/` にページごとの画像を配置
+2. PDFを高解像度で画像化して、`data/images/` にページごとの画像を配置
 
 ```bash
 mkdir -p data/images
-pdftoppm -png timetable.pdf data/images/page
+pdftoppm -png -r 400 timetable.pdf data/images/page
 ```
 
-3. 画像解析を実行
+※ WSL2 で `pdftoppm` をインストールして実行
+
+3. 画像の解像度と座標を確認します
+
+```bash
+npm run inspect-image -- data/images/page-01.png
+```
+
+4. 1列だけ切り出して確認します
+
+```bash
+npm run extract-column -- data/images/page-01.png 0
+```
+
+5. 画像解析を実行
 
 ```bash
 npm run parse-images
 ```
 
-4. 出力CSVは `data/output.csv` に保存されます。
+5. 出力CSVは `data/output.csv` に保存されます。
 
 ## 解析の流れ
 
@@ -37,11 +51,20 @@ npm run parse-images
 3. 各列ごとに縦に並んだ項目ごとに切り出し
 4. Tesseract OCRで文字列を抽出しCSV化
 
+## 画像レイアウト設定について
+
+- `src/tableConfig.js` の `tableRect` はテーブル全体の左上/右下座標
+- `fields[].y` は `tableRect.top` からの相対位置
+- `columns` は横に並んだ列数
+- 必要なら `columnWidths` で列ごとの横幅を個別指定できます
+
 ## ディレクトリ構成
 
 - `src/`
-  - `index.js` - エントリーポイント
-  - `pdfParser.js` - PDF読み込み・解析・CSV生成のロジック
+    - `index.js` - エントリーポイント
+    - `pdfParser.js` - PDF読み込み・解析・CSV生成のロジック
+    - `imageTableOcr.js` - 画像OCR解析ロジック
+    - `tableConfig.js` - 画像レイアウト設定
 - `data/` - PDF資料や出力CSVを置く場所
 
 ## 今後の対応
