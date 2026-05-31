@@ -55,10 +55,13 @@ export async function parseImageTimetable(imageDir) {
 		throw new Error(`画像ファイルが見つかりません: ${imageDir}`);
 	}
 
+	console.log(`解析対象画像数: ${imageFiles.length}件`);
+
 	const worker = await createWorker({
 		logger: (m) => {
+			// OCRの進捗ログが多すぎる場合は、この console.log をコメントアウトする
 			if (m.status === "recognizing text") {
-				console.log(`[OCR] ${m.status} ${Math.round((m.progress || 0) * 100)}%`);
+				// console.log(`[OCR] ${m.status} ${Math.round((m.progress || 0) * 100)}%`);
 			}
 		},
 	});
@@ -67,23 +70,34 @@ export async function parseImageTimetable(imageDir) {
 	await worker.loadLanguage("jpn");
 	await worker.initialize("jpn");
 
+	/**
+	 * @type {TimetableRecord[]}
+	 */
 	const records = [];
 
 	try {
 		for (const [index, fileName] of imageFiles.entries()) {
+			const fileIndex = index + 1;
+
 			// ファイル名からページ番号が取れない場合は、並び順をページ番号として扱う
-			const pageNumber = getPageNumber(fileName) || index + 1;
+			const pageNumber = getPageNumber(fileName) || fileIndex;
 			const layout = getLayoutForPage(pageNumber);
 
 			if (!layout) {
-				console.warn(`ページ ${pageNumber} のレイアウトが見つかりません。スキップします: ${fileName}`);
+				console.warn(`[${fileIndex}/${imageFiles.length}] ページ ${pageNumber} のレイアウトが見つかりません。スキップします: ${fileName}`);
 				continue;
 			}
 
-			console.log(`解析中: ${fileName} (ページ ${pageNumber}, ${layout.name}ページレイアウト)`);
+			console.log("");
+			console.log(`[${fileIndex}/${imageFiles.length}] 解析開始: ${fileName}`);
+			console.log(`ページ番号: ${pageNumber}`);
+			console.log(`レイアウト: ${layout.name}ページレイアウト`);
+			console.log(`列数: ${layout.columns}`);
 
-			const pageRecords = await parsePageImage(fileName, imageDir, pageNumber, layout, worker);
+			const pageRecords = await parsePageImage(fileName, imageDir, pageNumber, layout, worker, fileIndex, imageFiles.length);
 			records.push(...pageRecords);
+
+			console.log(`[${fileIndex}/${imageFiles.length}] 解析完了: ${fileName} / 出力レコード数: ${pageRecords.length}`);
 		}
 	} finally {
 		// OCRワーカーは重いリソースなので、途中でエラーになっても必ず終了する
@@ -127,9 +141,11 @@ async function getImageFiles(imageDir) {
  * @param {number} pageNumber ページ番号
  * @param {PageLayout} layout ページ解析用レイアウト定義
  * @param {import("tesseract.js").Worker} worker OCR解析用ワーカー
+ * @param {number} fileIndex 現在のファイル番号
+ * @param {number} fileCount 全体のファイル数
  * @returns {Promise<TimetableRecord[]>} ページ内のOCR解析結果
  */
-async function parsePageImage(fileName, imageDir, pageNumber, layout, worker) {
+async function parsePageImage(fileName, imageDir, pageNumber, layout, worker, fileIndex, fileCount) {
 	const filePath = path.join(imageDir, fileName);
 	const image = sharp(filePath);
 	const metadata = await image.metadata();
@@ -138,10 +154,13 @@ async function parsePageImage(fileName, imageDir, pageNumber, layout, worker) {
 	const pageRecords = [];
 
 	for (let columnIndex = 0; columnIndex < layout.columns; columnIndex += 1) {
+		const columnNumber = columnIndex + 1;
 		const rect = getColumnRect(layout, columnIndex);
 
+		console.log(`[${fileIndex}/${fileCount}] ${fileName} - 列 ${columnNumber}/${layout.columns} を解析中`);
+
 		if (rect.left + rect.width > metadata.width) {
-			console.warn(`列 ${columnIndex + 1} の幅が画像範囲を超えています。調整が必要です。`);
+			console.warn(`[${fileIndex}/${fileCount}] ${fileName} - 列 ${columnNumber}/${layout.columns} の幅が画像範囲を超えています。調整が必要です。`);
 			continue;
 		}
 
@@ -172,7 +191,9 @@ async function parsePageImage(fileName, imageDir, pageNumber, layout, worker) {
 			}
 
 			if (cropTop < 0 || cropHeight <= 0 || columnMetadata.width <= 0) {
-				console.warn(`フィールド ${field.key} (列${columnIndex}) の切り出し領域が不正です: cropTop=${cropTop}, cropHeight=${cropHeight}, width=${columnMetadata.width}, columnHeight=${columnMetadata.height}`);
+				console.warn(
+					`[${fileIndex}/${fileCount}] ${fileName} - フィールド ${field.key} (列${columnNumber}/${layout.columns}) の切り出し領域が不正です: cropTop=${cropTop}, cropHeight=${cropHeight}, width=${columnMetadata.width}, columnHeight=${columnMetadata.height}`,
+				);
 				record[field.key] = "";
 				continue;
 			}
@@ -193,8 +214,11 @@ async function parsePageImage(fileName, imageDir, pageNumber, layout, worker) {
 				const rawText = await recognizeText(worker, fieldBuffer);
 				record[field.key] = normalizeField(field.key, rawText);
 			} catch (error) {
-				console.error(`フィールド ${field.key} (列${columnIndex}) の処理中にエラー: ${error.message}`);
+				const message = error instanceof Error ? error.message : String(error);
+
+				console.error(`[${fileIndex}/${fileCount}] ${fileName} - フィールド ${field.key} (列${columnNumber}/${layout.columns}) の処理中にエラー: ${message}`);
 				console.error(`  cropTop=${cropTop}, cropHeight=${cropHeight}, width=${rect.width}, columnBuffer size=${columnBuffer.length}`);
+
 				record[field.key] = "";
 			}
 		}
