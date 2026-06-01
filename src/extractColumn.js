@@ -45,7 +45,7 @@ async function main() {
 		const metadata = await image.metadata();
 		const rect = getColumnRect(layout, columnIndex);
 
-		if (rect.left + rect.width > metadata.width || rect.top + rect.height > metadata.height) {
+		if (metadata.width === undefined || rect.left + rect.width > metadata.width || metadata.height === undefined || rect.top + rect.height > metadata.height) {
 			console.error("指定した領域が画像の範囲外です。src/tableConfig.js の tableRect または columns の設定を確認してください。");
 			console.error(`画像サイズ: ${metadata.width}x${metadata.height}`);
 			console.error(`切り出し領域: left=${rect.left}, top=${rect.top}, width=${rect.width}, height=${rect.height}`);
@@ -58,7 +58,8 @@ async function main() {
 		console.log(`出力: ${outputPath}`);
 		console.log(`切り出し領域: left=${rect.left}, top=${rect.top}, width=${rect.width}, height=${rect.height}`);
 	} catch (error) {
-		console.error("画像の切り出しに失敗しました:", error.message);
+		const message = error instanceof Error ? error.message : String(error);
+		console.error("画像の切り出しに失敗しました:", message);
 		process.exit(1);
 	}
 }

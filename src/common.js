@@ -19,11 +19,23 @@ import { pageLayouts } from "./tableConfig.js";
  */
 
 /**
+ * OCR対象フィールド定義
+ * @typedef {Object} LayoutField
+ * @property {string} key 出力項目名
+ * @property {number} y 列画像内のY座標
+ * @property {number} height 切り出し高さ
+ */
+
+/**
  * ページ解析用レイアウト定義
  * @typedef {Object} PageLayout
- * @property {TableRect} tableRect テーブル領域
+ * @property {string} name レイアウト名
  * @property {number} columns 列数
- * @property {number[]} [columnWidths] 列ごとの幅
+ * @property {number} rowMargin 項目切り出し時の上下余白
+ * @property {string} operatingDay 運行日区分
+ * @property {string} revisionDate 改正日
+ * @property {TableRect} tableRect テーブル領域
+ * @property {LayoutField[]} fields OCR対象フィールド一覧
  */
 
 /**
@@ -95,7 +107,7 @@ export function getColumnRect(layout, columnIndex) {
 	const left = layout.tableRect.left;
 	const top = layout.tableRect.top;
 	const tableWidth = layout.tableRect.right - layout.tableRect.left;
-	const columnWidths = layout.columnWidths || Array(layout.columns).fill(tableWidth / layout.columns);
+	const columnWidths = Array(layout.columns).fill(tableWidth / layout.columns);
 
 	const offsetLeft = Math.round(left + columnWidths.slice(0, columnIndex).reduce((sum, w) => sum + w, 0));
 	const right = Math.round(left + columnWidths.slice(0, columnIndex + 1).reduce((sum, w) => sum + w, 0));

@@ -16,32 +16,12 @@ const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".tif", ".tiff", ".we
  */
 
 /**
- * OCR対象フィールド定義
- * @typedef {Object} LayoutField
- * @property {string} key 出力項目名
- * @property {number} y 列画像内のY座標
- * @property {number} height 切り出し高さ
- */
-
-/**
  * テーブル矩形定義
  * @typedef {Object} TableRect
  * @property {number} left 左端X座標
  * @property {number} top 上端Y座標
  * @property {number} right 右端X座標
  * @property {number} bottom 下端Y座標
- */
-
-/**
- * ページ解析用レイアウト定義
- * @typedef {Object} PageLayout
- * @property {string} name レイアウト名
- * @property {number} columns 列数
- * @property {number} rowMargin 項目切り出し時の上下余白
- * @property {string} operatingDay 運行日区分
- * @property {string} revisionDate 改正日
- * @property {TableRect} tableRect テーブル領域
- * @property {LayoutField[]} fields OCR対象フィールド一覧
  */
 
 /**
@@ -139,7 +119,7 @@ async function getImageFiles(imageDir) {
  * @param {string} fileName 画像ファイル名
  * @param {string} imageDir 画像ファイルが格納されているディレクトリ
  * @param {number} pageNumber ページ番号
- * @param {PageLayout} layout ページ解析用レイアウト定義
+ * @param {import("./common.js").PageLayout} layout ページ解析用レイアウト定義
  * @param {import("tesseract.js").Worker} worker OCR解析用ワーカー
  * @param {number} fileIndex 現在のファイル番号
  * @param {number} fileCount 全体のファイル数
@@ -159,7 +139,7 @@ async function parsePageImage(fileName, imageDir, pageNumber, layout, worker, fi
 
 		console.log(`[${fileIndex}/${fileCount}] ${fileName} - 列 ${columnNumber}/${layout.columns} を解析中`);
 
-		if (rect.left + rect.width > metadata.width) {
+		if (metadata.width === undefined || rect.left + rect.width > metadata.width) {
 			console.warn(`[${fileIndex}/${fileCount}] ${fileName} - 列 ${columnNumber}/${layout.columns} の幅が画像範囲を超えています。調整が必要です。`);
 			continue;
 		}
@@ -168,6 +148,11 @@ async function parsePageImage(fileName, imageDir, pageNumber, layout, worker, fi
 		const columnBuffer = await image.clone().extract(rect).png().toBuffer();
 		const columnImage = sharp(columnBuffer);
 		const columnMetadata = await columnImage.metadata();
+
+		if (columnMetadata === undefined || columnMetadata.width === undefined || columnMetadata.height === undefined) {
+			console.warn(`[${fileIndex}/${fileCount}] ${fileName} - 列 ${columnNumber}/${layout.columns} の画像メタデータが取得できませんでした。スキップします。`);
+			continue;
+		}
 
 		if (columnIndex === 0) {
 			console.log(`[DEBUG] rect: left=${rect.left}, top=${rect.top}, width=${rect.width}, height=${rect.height}`);
@@ -371,11 +356,37 @@ function normalizeDigits(text) {
 }
 
 /**
+ * 指定文字数の同じ2回繰り返しを1回にまとめる
+ * @param {string} text 変換対象文字列
+ * @param {number[]} lengths 対象にする文字数
+ * @returns {string} 変換後文字列
+ */
+function collapseRepeatedText(text, lengths) {
+	for (const length of lengths) {
+		if (text.length !== length * 2) {
+			continue;
+		}
+
+		const first = text.slice(0, length);
+		const second = text.slice(length);
+
+		if (first === second) {
+			return first;
+		}
+	}
+
+	return text;
+}
+
+/**
  * OCR結果の時刻文字列をHHmm形式に正規化する
  * @param {string} text OCR結果文字列
  * @returns {string} HHmm形式の時刻文字列
  */
 function normalizeTime(text) {
+
+	text = collapseRepeatedText(text, [3, 4]);
+
 	// 時刻文字列に「レ」が含まれている場合は止まらないため「0」とみなす
 	if (/レ/.test(text)) {
 		return "0";
