@@ -52,6 +52,7 @@ export const csvHeader = [
 	{ id: "運行日区分", title: "運行日区分" },
 	{ id: "改正日", title: "改正日" },
 	{ id: "ページ番号", title: "ページ番号" },
+	{ id: "列番号", title: "列番号" },
 	{ id: "列車番号", title: "列車番号" },
 	{ id: "運行種別", title: "運行種別" },
 	{ id: "行先", title: "行先" },

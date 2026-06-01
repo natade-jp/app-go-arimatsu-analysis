@@ -164,6 +164,7 @@ async function parsePageImage(fileName, imageDir, pageNumber, layout, worker, fi
 			運行日区分: layout.operatingDay,
 			改正日: layout.revisionDate,
 			ページ番号: pageNumber,
+			列番号: columnNumber,
 		};
 
 		for (const field of layout.fields) {
@@ -384,7 +385,6 @@ function collapseRepeatedText(text, lengths) {
  * @returns {string} HHmm形式の時刻文字列
  */
 function normalizeTime(text) {
-
 	text = collapseRepeatedText(text, [3, 4]);
 
 	// 時刻文字列に「レ」が含まれている場合は止まらないため「0」とみなす
