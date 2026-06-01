@@ -258,6 +258,10 @@ function normalizeField(key, text) {
 		return normalizeTrainType(normalized);
 	}
 
+	if (key === "行先") {
+		return normalizeDestination(normalized);
+	}
+
 	return normalized;
 }
 
@@ -312,6 +316,7 @@ function normalizeTrainType(text) {
 		{ keyword: "特急", value: "特急" },
 		{ keyword: "急行", value: "急行" },
 		{ keyword: "準急", value: "準急" },
+		{ keyword: "快急", value: "快急" },
 
 		// OCRで「普通」が崩れやすいため、最後に判定する
 		{ keyword: "普通", value: "普通" },
@@ -319,9 +324,69 @@ function normalizeTrainType(text) {
 		{ keyword: "智通", value: "普通" },
 		{ keyword: "普", value: "普通" },
 		{ keyword: "通", value: "普通" },
+
+		{ keyword: "快暁", value: "快特" },
+
+		{ keyword: "湯思", value: "準急" },
+
+		{ keyword: "混思", value: "？急" },
+
+		{ keyword: "特思", value: "特急" },
+		{ keyword: "特怜", value: "特急" },
+
+		{ keyword: "る術", value: "急行" },
+		{ keyword: "る行", value: "急行" },
+		{ keyword: "行", value: "急行" },
+
+		{ keyword: "ムS", value: "μS" },
+		{ keyword: "S", value: "μS" },
+		{ keyword: "⑧", value: "μS" },
 	];
 
 	const correction = correctionList.find((item) => normalized.includes(item.keyword));
+
+	return correction?.value ?? normalized;
+}
+
+/**
+ * OCR結果の行先を正規化する
+ * @param {string} text OCR結果文字列
+ * @returns {string} 正規化後の行先
+ */
+function normalizeDestination(text) {
+	const normalized = text.replace(/\s+/g, "");
+
+	const correctionList = [
+		{ keyword: "囲", value: "伊奈" },
+		{ keyword: "和", value: "伊奈" },
+		{ keyword: "呑", value: "伊奈" },
+		{ keyword: "唐", value: "伊奈" },
+		{ keyword: "健", value: "本宿" },
+		{ keyword: "体", value: "本宿" },
+		{ keyword: "`神和", value: "河和" },
+		{ keyword: "吉良団", value: "吉良吉田" },
+		{ keyword: "吉良木田", value: "吉良吉田" },
+		{ keyword: "宇d", value: "須ケロ" },
+		{ keyword: "ャg", value: "須ケロ" },
+		{ keyword: "ャョ", value: "須ケロ" },
+		{ keyword: "彫ョ", value: "須ケロ" },
+		{ keyword: "`須ケ口", value: "須ケロ" },
+		{ keyword: "`豊橋", value: "豊橋" },
+		{ keyword: "談", value: "豊橋？一宮？" },
+		{ keyword: "論", value: "豊明" },
+		{ keyword: "國", value: "豊明" },
+		{ keyword: "o", value: "豊明" },
+		{ keyword: "e", value: "豊明" },
+		{ keyword: "n", value: "河和" },
+		{ keyword: "a", value: "河和" },
+		{ keyword: "ae", value: "鳴海" },
+		{ keyword: "Aml", value: "太田川" },
+		{ keyword: "`東岡崎", value: "東岡崎" },
+		{ keyword: "閉", value: "金山" },
+		{ keyword: "中部国際空淑", value: "中部国際空港" },
+	];
+
+	const correction = correctionList.find((item) => normalized === item.keyword);
 
 	return correction?.value ?? normalized;
 }
