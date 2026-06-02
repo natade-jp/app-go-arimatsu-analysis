@@ -262,6 +262,10 @@ function normalizeField(key, text) {
 		return normalizeDestination(normalized);
 	}
 
+	if (key === "備考") {
+		return normalizeNotes(normalized);
+	}
+
 	return normalized;
 }
 
@@ -303,6 +307,28 @@ function normalizeTrainNumber(text) {
  */
 
 /**
+ * @typedef {Object} ReplaceRule
+ * @property {string} from 置換前の文字
+ * @property {string} to 置換後の文字
+ */
+
+/**
+ * 置換ルールに従って文字列を置換する
+ * @param {string} text 置換対象の文字列
+ * @param {ReplaceRule[]} rules 置換ルール一覧
+ * @returns {string} 置換後の文字列
+ */
+function replaceByRules(text, rules) {
+	let result = text;
+
+	for (const rule of rules) {
+		result = result.replaceAll(rule.from, rule.to);
+	}
+
+	return result;
+}
+
+/**
  * OCR結果の運行種別を正規化する
  * @param {string} text OCR結果文字列
  * @returns {string} 正規化後の運行種別
@@ -318,7 +344,6 @@ function normalizeTrainType(text) {
 		{ keyword: "準急", value: "準急" },
 		{ keyword: "快急", value: "快急" },
 
-		// OCRで「普通」が崩れやすいため、最後に判定する
 		{ keyword: "普通", value: "普通" },
 		{ keyword: "暗通", value: "普通" },
 		{ keyword: "智通", value: "普通" },
@@ -327,6 +352,9 @@ function normalizeTrainType(text) {
 
 		{ keyword: "快暁", value: "快特" },
 
+		{ keyword: "漸忠", value: "準急" },
+		{ keyword: "漸会", value: "準急" },
+		{ keyword: "準思", value: "準急" },
 		{ keyword: "湯思", value: "準急" },
 
 		{ keyword: "混思", value: "？急" },
@@ -361,29 +389,92 @@ function normalizeDestination(text) {
 		{ keyword: "和", value: "伊奈" },
 		{ keyword: "呑", value: "伊奈" },
 		{ keyword: "唐", value: "伊奈" },
+
 		{ keyword: "健", value: "本宿" },
 		{ keyword: "体", value: "本宿" },
+
 		{ keyword: "`神和", value: "河和" },
-		{ keyword: "吉良団", value: "吉良吉田" },
+
 		{ keyword: "吉良木田", value: "吉良吉田" },
+		{ keyword: "吉良杏田", value: "吉良吉田" },
+		{ keyword: "吉良希田", value: "吉良吉田" },
+		{ keyword: "吉良希田", value: "吉良吉田" },
+		{ keyword: "吉良昌田", value: "吉良吉田" },
+		{ keyword: "吉良昌田", value: "吉良吉田" },
+		{ keyword: "吉良団", value: "吉良吉田" },
+		{ keyword: "吉良田", value: "吉良吉田" },
+
 		{ keyword: "宇d", value: "須ケロ" },
 		{ keyword: "ャg", value: "須ケロ" },
 		{ keyword: "ャョ", value: "須ケロ" },
 		{ keyword: "彫ョ", value: "須ケロ" },
 		{ keyword: "`須ケ口", value: "須ケロ" },
+
 		{ keyword: "`豊橋", value: "豊橋" },
 		{ keyword: "談", value: "豊橋？一宮？" },
 		{ keyword: "論", value: "豊明" },
 		{ keyword: "國", value: "豊明" },
 		{ keyword: "o", value: "豊明" },
 		{ keyword: "e", value: "豊明" },
+
+		{ keyword: "神和", value: "河和" },
 		{ keyword: "n", value: "河和" },
 		{ keyword: "a", value: "河和" },
+
+		{ keyword: "内海", value: "内海" },
+
 		{ keyword: "ae", value: "鳴海" },
+
 		{ keyword: "Aml", value: "太田川" },
+
 		{ keyword: "`東岡崎", value: "東岡崎" },
+
+		{ keyword: "家常滑", value: "常滑" },
+
 		{ keyword: "閉", value: "金山" },
+
+		{ keyword: "中部国隠空港", value: "中部国際空港" },
 		{ keyword: "中部国際空淑", value: "中部国際空港" },
+	];
+
+	const correction = correctionList.find((item) => normalized === item.keyword);
+
+	return correction?.value ?? normalized;
+}
+
+/**
+ * OCR結果の備考を正規化する
+ * @param {string} text OCR結果文字列
+ * @returns {string} 正規化後の備考
+ */
+function normalizeNotes(text) {
+	let normalized = text.replace(/\s+/g, "");
+
+	/** @type {ReplaceRule[]} */
+	const replaceRules = [
+		{ from: "一部特別木", to: "一部特別車" },
+
+		{ from: "新享城", to: "新安城" },
+
+		{ from: "亨岡崎", to: "東岡崎" },
+
+		{ from: "名吉屋", to: "名古屋" },
+
+		{ from: "から[", to: "から普通" },
+
+		{ from: "調通", to: "普通" },
+		{ from: "商通", to: "普通" },
+		{ from: "智通", to: "普通" },
+		{ from: "暁通", to: "普通" },
+
+		{ from: "琶急", to: "準急" },
+		{ from: "塔急", to: "準急" },
+	];
+	normalized = replaceByRules(normalized, replaceRules);
+
+	const correctionList = [
+		{ keyword: "閻", value: "" },
+		{ keyword: "國", value: "" },
 	];
 
 	const correction = correctionList.find((item) => normalized === item.keyword);
