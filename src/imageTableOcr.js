@@ -359,6 +359,7 @@ function normalizeTrainType(text) {
 
 		{ keyword: "混思", value: "？急" },
 
+		{ keyword: "脈思", value: "特急" },
 		{ keyword: "特思", value: "特急" },
 		{ keyword: "特怜", value: "特急" },
 
@@ -467,6 +468,7 @@ function normalizeNotes(text) {
 		{ from: "智通", to: "普通" },
 		{ from: "暁通", to: "普通" },
 
+		{ from: "塗急", to: "準急" },
 		{ from: "琶急", to: "準急" },
 		{ from: "塔急", to: "準急" },
 	];
