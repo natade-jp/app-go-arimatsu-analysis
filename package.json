@@ -8,7 +8,8 @@
 		"start": "node src/index.js",
 		"parse-images": "node src/index.js data/images data/output.csv",
 		"inspect-image": "node src/inspectImage.js",
-		"extract-column": "node src/extractColumn.js"
+		"extract-column": "node src/extractColumn.js",
+		"concat-columns": "node src/concatColumns.js"
 	},
 	"keywords": [
 		"meitetsu",

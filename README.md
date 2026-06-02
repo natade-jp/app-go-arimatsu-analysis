@@ -42,14 +42,36 @@ npm run extract-column -- data/images/page-01.png 0
 npm run parse-images
 ```
 
-5. 出力CSVは `data/output.csv` に保存されます。
+6. 出力CSVは `data/output.csv` に保存されます。
+
+## OCR結果の補正
+
+どうしても解析が難しい箇所は目視で確認が必要となります。
+そのために、以下のように画像ファイルと列番号のCSVを作成し、
+
+`columns.csv`
+
+```
+./data/images/page-01.png,4
+./data/images/page-01.png,7
+./data/images/page-01.png,9
+```
+
+以下を実行すると複数列をまとめて結合画像を作成します。
+
+```bash
+npm run concat-columns -- data/columns.csv output.png
+```
+
+これによりさらにOCR結果を修正してください。
 
 ## 解析の流れ
 
-1. PDFを外部ツールでPNG等の画像に変換
+1. PDFを`pdftoppm` でPNG画像に変換
 2. 画像のテーブル領域と列数を設定
-3. 各列ごとに縦に並んだ項目ごとに切り出し
-4. Tesseract OCRで文字列を抽出しCSV化
+3. `extract-column` で各列ごとに縦に並んだ項目ごとに切り出して設定値を作成
+4. `parse-images` でTesseract OCRで文字列を抽出しCSV化
+5. `concat-columns` で狙いのページの列だけを一括画像化し、目視でCSVを修正
 
 ## 画像レイアウト設定について
 
@@ -64,11 +86,5 @@ npm run parse-images
     - `index.js` - エントリーポイント
     - `imageTableOcr.js` - 画像OCR解析ロジック
     - `tableConfig.js` - 画像レイアウト設定
+    - `concatColumns.js` - 複数列の縦長画像を結合して出力
 - `data/` - PDF資料や出力CSVを置く場所
-
-## 今後の対応
-
-- OCRを使ったPDFの文字抽出
-- 名鉄時刻表のレイアウトに応じたテーブル解析
-- 名古屋駅〜有松駅に絞ったCSV生成
-- 解析精度を上げるための例外処理とログ出力

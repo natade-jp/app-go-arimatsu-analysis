@@ -30,6 +30,16 @@
 			"cwd": "${workspaceFolder}",
 			"console": "integratedTerminal",
 			"skipFiles": ["<node_internals>/**"]
+		},
+		{
+			"type": "node",
+			"request": "launch",
+			"name": "npm run concat-columns",
+			"runtimeExecutable": "npm",
+			"runtimeArgs": ["run", "concat-columns", "--", "data/columns.csv", "output.png"],
+			"cwd": "${workspaceFolder}",
+			"console": "integratedTerminal",
+			"skipFiles": ["<node_internals>/**"]
 		}
 	]
 }
