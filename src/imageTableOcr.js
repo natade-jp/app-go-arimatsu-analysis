@@ -389,6 +389,8 @@ function normalizeTrainType(text) {
 		{ keyword: "る行", value: "急行" },
 		{ keyword: "行", value: "急行" },
 
+		{ keyword: "々ルや", value: "μS" },
+		{ keyword: "7衝こ】", value: "μS" },
 		{ keyword: "ムS", value: "μS" },
 		{ keyword: "S", value: "μS" },
 		{ keyword: "⑧", value: "μS" },
@@ -420,6 +422,7 @@ function normalizeDestination(text) {
 
 		{ keyword: "`神和", value: "河和" },
 
+		{ keyword: "吉良天田", value: "吉良吉田" },
 		{ keyword: "吉良木田", value: "吉良吉田" },
 		{ keyword: "吉良杏田", value: "吉良吉田" },
 		{ keyword: "吉良希田", value: "吉良吉田" },
@@ -433,6 +436,7 @@ function normalizeDestination(text) {
 		{ keyword: "ャg", value: "須ケロ" },
 		{ keyword: "ャョ", value: "須ケロ" },
 		{ keyword: "彫ョ", value: "須ケロ" },
+		{ keyword: "須ケグロ", value: "須ケロ" },
 		{ keyword: "`須ケ口", value: "須ケロ" },
 
 		{ keyword: "`豊橋", value: "豊橋" },
@@ -477,6 +481,7 @@ function normalizeNotes(text) {
 
 	/** @type {ReplaceRule[]} */
 	const replaceRules = [
+		{ from: "ーー部特別車", to: "一部特別車" },
 		{ from: "一部特別木", to: "一部特別車" },
 
 		{ from: "新享城", to: "新安城" },
@@ -494,6 +499,7 @@ function normalizeNotes(text) {
 		{ from: "智通", to: "普通" },
 		{ from: "暁通", to: "普通" },
 
+		{ from: "人準急", to: "準急" },
 		{ from: "雙急", to: "準急" },
 		{ from: "遜急", to: "準急" },
 		{ from: "塗急", to: "準急" },
