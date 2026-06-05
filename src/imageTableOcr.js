@@ -5,7 +5,7 @@ import path from "path";
 import sharp from "sharp";
 import { createWorker } from "tesseract.js";
 import { createObjectCsvWriter } from "csv-writer";
-import { compareImageNames, getColumnRect, getLayoutForPage, getPageNumber, csvHeader } from "./common.js";
+import { blankHorizontalBorders, blankMarginAreas, compareImageNames, getColumnRect, getLayoutForPage, getPageNumber, csvHeader } from "./common.js";
 
 /** @type {ReadonlySet<string>} */
 const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".tif", ".tiff", ".webp"]);
@@ -146,12 +146,17 @@ async function parsePageImage(fileName, imageDir, pageNumber, layout, worker, fi
 
 		// sharp は加工パイプラインを持つため、同じ画像から複数回切り出す場合は clone() して処理を分離する
 		const columnBuffer = await image.clone().extract(rect).png().toBuffer();
-		const columnImage = sharp(columnBuffer);
+		let columnImage = sharp(columnBuffer);
 		const columnMetadata = await columnImage.metadata();
 
 		if (columnMetadata === undefined || columnMetadata.width === undefined || columnMetadata.height === undefined) {
 			console.warn(`[${fileIndex}/${fileCount}] ${fileName} - 列 ${columnNumber}/${layout.columns} の画像メタデータが取得できませんでした。スキップします。`);
 			continue;
+		}
+
+		if (layout.horizontalMargin > 0) {
+			const maskedColumnBuffer = await blankHorizontalBorders(columnBuffer, columnMetadata.width, columnMetadata.height, layout.horizontalMargin);
+			columnImage = sharp(maskedColumnBuffer);
 		}
 
 		if (columnIndex === 0) {
@@ -186,7 +191,7 @@ async function parsePageImage(fileName, imageDir, pageNumber, layout, worker, fi
 
 			try {
 				// 列画像からフィールド単位で再切り出しして、OCRに渡す画像を小さくする
-				const fieldBuffer = await columnImage
+				let fieldBuffer = await columnImage
 					.clone()
 					.extract({
 						left: 0,
@@ -196,6 +201,15 @@ async function parsePageImage(fileName, imageDir, pageNumber, layout, worker, fi
 					})
 					.png()
 					.toBuffer();
+
+				const topMarginPixels = field.y - cropTop;
+				const bottomMarginPixels = cropHeight - field.height - topMarginPixels;
+				if (topMarginPixels > 0 || bottomMarginPixels > 0) {
+					fieldBuffer = await blankMarginAreas(fieldBuffer, columnMetadata.width, cropHeight, {
+						top: topMarginPixels,
+						bottom: bottomMarginPixels,
+					});
+				}
 
 				const rawText = await recognizeText(worker, fieldBuffer);
 				const normalizedText = normalizeField(field.key, rawText);

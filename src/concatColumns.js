@@ -3,7 +3,7 @@
 import fs from "fs/promises";
 import path from "path";
 import sharp from "sharp";
-import { getColumnRect, getLayoutForPage, getPageNumber } from "./common.js";
+import { blankHorizontalBorders, blankMarginAreas, getColumnRect, getLayoutForPage, getPageNumber } from "./common.js";
 
 async function main() {
 	const [csvPath, outputPathArg] = process.argv.slice(2);
@@ -105,10 +105,15 @@ async function buildVerticalColumnStrip(imagePath, layout, columnIndex) {
 	}
 
 	const columnBuffer = await image.clone().extract(rect).png().toBuffer();
-	const columnImage = sharp(columnBuffer);
+	let columnImage = sharp(columnBuffer);
 	const columnMetadata = await columnImage.metadata();
 	if (columnMetadata.width === undefined || columnMetadata.height === undefined) {
 		throw new Error(`列画像のメタデータが取得できませんでした: ${imagePath}`);
+	}
+
+	if (layout.horizontalMargin > 0) {
+		const maskedColumnBuffer = await blankHorizontalBorders(columnBuffer, columnMetadata.width, columnMetadata.height, layout.horizontalMargin);
+		columnImage = sharp(maskedColumnBuffer);
 	}
 
 	const fieldImages = [];
@@ -122,7 +127,15 @@ async function buildVerticalColumnStrip(imagePath, layout, columnIndex) {
 			throw new Error(`フィールド切り出しに失敗しました: ${field.key} y=${field.y} height=${field.height}`);
 		}
 
-		const fieldBuffer = await columnImage.clone().extract({ left: 0, top: cropTop, width: columnMetadata.width, height: cropHeight }).png().toBuffer();
+		let fieldBuffer = await columnImage.clone().extract({ left: 0, top: cropTop, width: columnMetadata.width, height: cropHeight }).png().toBuffer();
+		const topMarginPixels = field.y - cropTop;
+		const bottomMarginPixels = cropHeight - field.height - topMarginPixels;
+		if (topMarginPixels > 0 || bottomMarginPixels > 0) {
+			fieldBuffer = await blankMarginAreas(fieldBuffer, columnMetadata.width, cropHeight, {
+				top: topMarginPixels,
+				bottom: bottomMarginPixels,
+			});
+		}
 
 		fieldImages.push({ buffer: fieldBuffer, top: totalHeight });
 		totalHeight += cropHeight;

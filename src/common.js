@@ -1,5 +1,6 @@
 // @ts-check
 
+import sharp from "sharp";
 import { pageLayouts } from "./tableConfig.js";
 
 /**
@@ -32,6 +33,7 @@ import { pageLayouts } from "./tableConfig.js";
  * @property {string} name レイアウト名
  * @property {number} columns 列数
  * @property {number} rowMargin 項目切り出し時の上下余白
+ * @property {number} horizontalMargin 項目切り出し画像の左右を白で塗りつぶす幅
  * @property {string} operatingDay 運行日区分
  * @property {string} revisionDate 改正日
  * @property {TableRect} tableRect テーブル領域
@@ -119,4 +121,87 @@ export function getColumnRect(layout, columnIndex) {
 		width: right - offsetLeft,
 		height: layout.tableRect.bottom - layout.tableRect.top,
 	};
+}
+
+/**
+ * 左右の縦線を消すために、指定幅分を白で塗りつぶす
+ * @param {Buffer} buffer 元画像バッファ
+ * @param {number} width 画像幅
+ * @param {number} height 画像高さ
+ * @param {number} margin 左右それぞれの白塗り幅
+ * @returns {Promise<Buffer>} 白塗り後の画像バッファ
+ */
+export async function blankMarginAreas(buffer, width, height, { left = 0, right = 0, top = 0, bottom = 0 } = {}) {
+	const leftMargin = Math.min(Math.max(0, left), Math.floor(width / 2));
+	const rightMargin = Math.min(Math.max(0, right), Math.floor(width / 2));
+	const topMargin = Math.min(Math.max(0, top), Math.floor(height / 2));
+	const bottomMargin = Math.min(Math.max(0, bottom), Math.floor(height / 2));
+
+	if (leftMargin === 0 && rightMargin === 0 && topMargin === 0 && bottomMargin === 0) {
+		return buffer;
+	}
+
+	const composites = [];
+
+	if (leftMargin > 0) {
+		const leftStrip = await sharp({
+			create: {
+				width: leftMargin,
+				height: height,
+				channels: 4,
+				background: { r: 255, g: 255, b: 255, alpha: 1 },
+			},
+		})
+			.png()
+			.toBuffer();
+		composites.push({ input: leftStrip, left: 0, top: 0 });
+	}
+
+	if (rightMargin > 0) {
+		const rightStrip = await sharp({
+			create: {
+				width: rightMargin,
+				height: height,
+				channels: 4,
+				background: { r: 255, g: 255, b: 255, alpha: 1 },
+			},
+		})
+			.png()
+			.toBuffer();
+		composites.push({ input: rightStrip, left: width - rightMargin, top: 0 });
+	}
+
+	if (topMargin > 0) {
+		const topStrip = await sharp({
+			create: {
+				width: width,
+				height: topMargin,
+				channels: 4,
+				background: { r: 255, g: 255, b: 255, alpha: 1 },
+			},
+		})
+			.png()
+			.toBuffer();
+		composites.push({ input: topStrip, left: 0, top: 0 });
+	}
+
+	if (bottomMargin > 0) {
+		const bottomStrip = await sharp({
+			create: {
+				width: width,
+				height: bottomMargin,
+				channels: 4,
+				background: { r: 255, g: 255, b: 255, alpha: 1 },
+			},
+		})
+			.png()
+			.toBuffer();
+		composites.push({ input: bottomStrip, left: 0, top: height - bottomMargin });
+	}
+
+	return sharp(buffer).composite(composites).png().toBuffer();
+}
+
+export async function blankHorizontalBorders(buffer, width, height, margin) {
+	return blankMarginAreas(buffer, width, height, { left: margin, right: margin });
 }

@@ -18,6 +18,7 @@ export const pageLayouts = {
 		},
 		columns: 20,
 		rowMargin: 8,
+		horizontalMargin: 4,
 		fields: [
 			{ key: "列車番号", y: 2, height: 44 },
 			{ key: "運行種別", y: 72, height: 52 },
@@ -44,6 +45,7 @@ export const pageLayouts = {
 		},
 		columns: 20,
 		rowMargin: 8,
+		horizontalMargin: 4,
 		fields: [
 			{ key: "列車番号", y: 2, height: 44 },
 			{ key: "運行種別", y: 72, height: 52 },
