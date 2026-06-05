@@ -10,6 +10,8 @@ import { blankHorizontalBorders, blankMarginAreas, compareImageNames, getColumnR
 /** @type {ReadonlySet<string>} */
 const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".tif", ".tiff", ".webp"]);
 
+let currentWhitelist = "";
+
 /**
  * CSV出力用レコード
  * @typedef {Object.<string, string | number>} TimetableRecord
@@ -211,7 +213,7 @@ async function parsePageImage(fileName, imageDir, pageNumber, layout, worker, fi
 					});
 				}
 
-				const rawText = await recognizeText(worker, fieldBuffer);
+				const rawText = await recognizeText(worker, fieldBuffer, field.whitelist);
 				const normalizedText = normalizeField(field.key, rawText);
 
 				// OCR結果のログは必要に応じて出力する。大量のフィールドがある場合は、ログをコメントアウトしても良い。
@@ -241,9 +243,15 @@ async function parsePageImage(fileName, imageDir, pageNumber, layout, worker, fi
  * 画像バッファから文字列をOCR解析する
  * @param {import("tesseract.js").Worker} worker OCR解析用ワーカー
  * @param {Buffer} imageBuffer OCR対象画像バッファ
+ * @param {string | undefined} [whitelist] OCRで許可する文字セット
  * @returns {Promise<string>} OCR解析結果文字列
  */
-async function recognizeText(worker, imageBuffer) {
+async function recognizeText(worker, imageBuffer, whitelist) {
+	const targetWhitelist = typeof whitelist === "string" && whitelist.length > 0 ? whitelist : "";
+	if (targetWhitelist !== currentWhitelist) {
+		await worker.setParameters({ tessedit_char_whitelist: targetWhitelist });
+		currentWhitelist = targetWhitelist;
+	}
 	const { data } = await worker.recognize(imageBuffer);
 	return (data.text || "").trim();
 }

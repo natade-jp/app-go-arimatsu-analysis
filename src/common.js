@@ -25,6 +25,7 @@ import { pageLayouts } from "./tableConfig.js";
  * @property {string} key 出力項目名
  * @property {number} y 列画像内のY座標
  * @property {number} height 切り出し高さ
+ * @property {string} [whitelist] OCR文字種制限のための Tesseract whitelist
  */
 
 /**
@@ -124,11 +125,11 @@ export function getColumnRect(layout, columnIndex) {
 }
 
 /**
- * 左右の縦線を消すために、指定幅分を白で塗りつぶす
+ * 画像の指定境界を白で塗りつぶす
  * @param {Buffer} buffer 元画像バッファ
  * @param {number} width 画像幅
  * @param {number} height 画像高さ
- * @param {number} margin 左右それぞれの白塗り幅
+ * @param {{left?: number, right?: number, top?: number, bottom?: number}} [margins] 塗りつぶす余白の幅
  * @returns {Promise<Buffer>} 白塗り後の画像バッファ
  */
 export async function blankMarginAreas(buffer, width, height, { left = 0, right = 0, top = 0, bottom = 0 } = {}) {
