@@ -407,6 +407,8 @@ function normalizeDestination(text) {
 
 		{ keyword: "健", value: "本宿" },
 		{ keyword: "体", value: "本宿" },
+		{ keyword: "本街", value: "本宿" },
+		{ keyword: "本眼", value: "本宿" },
 
 		{ keyword: "`神和", value: "河和" },
 
@@ -473,15 +475,19 @@ function normalizeNotes(text) {
 
 		{ from: "亨岡崎", to: "東岡崎" },
 
+		{ from: "名号屋", to: "名古屋" },
 		{ from: "名吉屋", to: "名古屋" },
 
 		{ from: "から[", to: "から普通" },
 
+		{ from: "景通", to: "普通" },
 		{ from: "調通", to: "普通" },
 		{ from: "商通", to: "普通" },
 		{ from: "智通", to: "普通" },
 		{ from: "暁通", to: "普通" },
 
+		{ from: "雙急", to: "準急" },
+		{ from: "遜急", to: "準急" },
 		{ from: "塗急", to: "準急" },
 		{ from: "琶急", to: "準急" },
 		{ from: "塔急", to: "準急" },
