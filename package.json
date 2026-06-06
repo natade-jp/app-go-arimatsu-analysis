@@ -22,7 +22,7 @@
 		"csv-writer": "^1.6.0",
 		"pdf-parse": "^1.1.1",
 		"sharp": "^0.32.5",
-		"tesseract.js": "^4.1.1"
+		"tesseract.js": "^4.1.4"
 	},
 	"engines": {
 		"node": ">=18"
