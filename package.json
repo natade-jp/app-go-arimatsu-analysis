@@ -20,9 +20,9 @@
 	],
 	"dependencies": {
 		"csv-writer": "^1.6.0",
+		"multilingual-purejs-ocr": "^1.0.1",
 		"pdf-parse": "^1.1.1",
-		"sharp": "^0.32.5",
-		"tesseract.js": "^4.1.1"
+		"sharp": "^0.34.5"
 	},
 	"engines": {
 		"node": ">=18"

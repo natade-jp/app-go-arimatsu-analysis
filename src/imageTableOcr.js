@@ -3,7 +3,8 @@
 import fs from "fs/promises";
 import path from "path";
 import sharp from "sharp";
-import { createWorker } from "tesseract.js";
+import Ocr from "multilingual-purejs-ocr";
+import os from "os";
 import { createObjectCsvWriter } from "csv-writer";
 import { blankHorizontalBorders, blankMarginAreas, compareImageNames, getColumnRect, getLayoutForPage, getPageNumber, csvHeader } from "./common.js";
 
@@ -39,18 +40,8 @@ export async function parseImageTimetable(imageDir) {
 
 	console.log(`解析対象画像数: ${imageFiles.length}件`);
 
-	const worker = await createWorker({
-		logger: (m) => {
-			// OCRの進捗ログが多すぎる場合は、この console.log をコメントアウトする
-			if (m.status === "recognizing text") {
-				// console.log(`[OCR] ${m.status} ${Math.round((m.progress || 0) * 100)}%`);
-			}
-		},
-	});
-
-	await worker.load();
-	await worker.loadLanguage("jpn");
-	await worker.initialize("jpn");
+	// Create multilingual-purejs-ocr instance (Japanese)
+	const ocr = await Ocr.create({ language: "ja" });
 
 	/**
 	 * @type {TimetableRecord[]}
@@ -76,14 +67,12 @@ export async function parseImageTimetable(imageDir) {
 			console.log(`レイアウト: ${layout.name}ページレイアウト`);
 			console.log(`列数: ${layout.columns}`);
 
-			const pageRecords = await parsePageImage(fileName, imageDir, pageNumber, layout, worker, fileIndex, imageFiles.length);
+			const pageRecords = await parsePageImage(fileName, imageDir, pageNumber, layout, ocr, fileIndex, imageFiles.length);
 			records.push(...pageRecords);
 
 			console.log(`[${fileIndex}/${imageFiles.length}] 解析完了: ${fileName} / 出力レコード数: ${pageRecords.length}`);
 		}
 	} finally {
-		// OCRワーカーは重いリソースなので、途中でエラーになっても必ず終了する
-		await worker.terminate();
 	}
 
 	return records;
@@ -122,12 +111,12 @@ async function getImageFiles(imageDir) {
  * @param {string} imageDir 画像ファイルが格納されているディレクトリ
  * @param {number} pageNumber ページ番号
  * @param {import("./common.js").PageLayout} layout ページ解析用レイアウト定義
- * @param {import("tesseract.js").Worker} worker OCR解析用ワーカー
+ * @param {import("multilingual-purejs-ocr").Ocr} ocr OCR解析用ワーカー
  * @param {number} fileIndex 現在のファイル番号
  * @param {number} fileCount 全体のファイル数
  * @returns {Promise<TimetableRecord[]>} ページ内のOCR解析結果
  */
-async function parsePageImage(fileName, imageDir, pageNumber, layout, worker, fileIndex, fileCount) {
+async function parsePageImage(fileName, imageDir, pageNumber, layout, ocr, fileIndex, fileCount) {
 	const filePath = path.join(imageDir, fileName);
 	const image = sharp(filePath);
 	const metadata = await image.metadata();
@@ -213,7 +202,7 @@ async function parsePageImage(fileName, imageDir, pageNumber, layout, worker, fi
 					});
 				}
 
-				const rawText = await recognizeText(worker, fieldBuffer, field.whitelist);
+				const rawText = await recognizeText(ocr, fieldBuffer);
 				const normalizedText = normalizeField(field.key, rawText);
 
 				// OCR結果のログは必要に応じて出力する。大量のフィールドがある場合は、ログをコメントアウトしても良い。
@@ -241,19 +230,32 @@ async function parsePageImage(fileName, imageDir, pageNumber, layout, worker, fi
 
 /**
  * 画像バッファから文字列をOCR解析する
- * @param {import("tesseract.js").Worker} worker OCR解析用ワーカー
+ * @param {import("multilingual-purejs-ocr").Ocr} ocr OCR解析用ワーカー
  * @param {Buffer} imageBuffer OCR対象画像バッファ
- * @param {string | undefined} [whitelist] OCRで許可する文字セット
  * @returns {Promise<string>} OCR解析結果文字列
  */
-async function recognizeText(worker, imageBuffer, whitelist) {
-	const targetWhitelist = typeof whitelist === "string" && whitelist.length > 0 ? whitelist : "";
-	if (targetWhitelist !== currentWhitelist) {
-		await worker.setParameters({ tessedit_char_whitelist: targetWhitelist });
-		currentWhitelist = targetWhitelist;
+async function recognizeText(ocr, imageBuffer) {
+	// multilingual-purejs-ocr currently accepts a file path; write buffer to temp file
+	const tmpPath = path.join(os.tmpdir(), `mpocr-${Date.now()}-${Math.random().toString(36).slice(2)}.png`);
+	await fs.writeFile(tmpPath, imageBuffer);
+	try {
+		// grouped:false returns individual elements for simpler post-processing
+		const result = await ocr.detect(tmpPath, { grouped: false });
+		const texts = Array.isArray(result?.data) ? result.data.map((e) => e.text || "").filter(Boolean) : [];
+		let rawText = texts.join("\n");
+
+		return rawText.trim();
+	} finally {
+		try {
+			await fs.unlink(tmpPath);
+		} catch (e) {
+			// ignore cleanup errors
+		}
 	}
-	const { data } = await worker.recognize(imageBuffer);
-	return (data.text || "").trim();
+}
+
+function escapeRegExp(s) {
+	return s.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&");
 }
 
 /**
