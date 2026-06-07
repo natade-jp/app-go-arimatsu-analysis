@@ -501,6 +501,7 @@ function normalizeNotes(text) {
 		{ from: "暁通", to: "普通" },
 
 		{ from: "人準急", to: "準急" },
+		{ from: "准急", to: "準急" },
 		{ from: "雙急", to: "準急" },
 		{ from: "遜急", to: "準急" },
 		{ from: "塗急", to: "準急" },
