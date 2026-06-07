@@ -390,6 +390,7 @@ function normalizeTrainType(text) {
 		{ keyword: "行", value: "急行" },
 
 		{ keyword: "々ルや", value: "μS" },
+		{ keyword: "7本く】", value: "μS" },
 		{ keyword: "7衝こ】", value: "μS" },
 		{ keyword: "ムS", value: "μS" },
 		{ keyword: "S", value: "μS" },
