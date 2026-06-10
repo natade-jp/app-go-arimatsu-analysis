@@ -44,6 +44,12 @@ npm run parse-images
 
 6. 出力CSVは `data/output.csv` に保存されます。
 
+7. 出力CSVを時刻整合性のチェックをする
+
+```bash
+npm run validate-csv -- data/output.csv
+```
+
 ## OCR結果の補正
 
 どうしても解析が難しい箇所は目視で確認が必要となります。

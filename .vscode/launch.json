@@ -14,6 +14,16 @@
 		{
 			"type": "node",
 			"request": "launch",
+			"name": "npm run validate-csv",
+			"runtimeExecutable": "npm",
+			"runtimeArgs": ["run", "validate-csv", "--", "${workspaceFolder}/data/output.csv"],
+			"cwd": "${workspaceFolder}",
+			"console": "integratedTerminal",
+			"skipFiles": ["<node_internals>/**"]
+		},
+		{
+			"type": "node",
+			"request": "launch",
 			"name": "npm run inspect-image",
 			"runtimeExecutable": "npm",
 			"runtimeArgs": ["run", "inspect-image"],
